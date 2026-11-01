@@ -50,6 +50,8 @@ def main():
                 highest_reward = total_reward
                 print("New highest reward: {total_reward}.")
 
+                saveQ(q_table, "yay line follow")
+
             env.reset()
             epsilon = max(0.01, epsilon * epsilon_decay)  # Decay epsilon
 

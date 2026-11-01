@@ -140,8 +140,17 @@ class LineFollowerEnv(GazeboEnv):
         '''
         vel_cmd = RosTwist()
 
-        # TODO: Impelement process action.
-        
+        if action == 0:
+            vel_cmd.linear.x = 0.1
+            vel_cmd.angular.z = 0.5
+
+        elif action == 1:
+            vel_cmd.linear.x = 0.3
+
+        elif action == 2:
+            vel_cmd.linear.x = 0.1
+            vel_cmd.angular.z = -0.5
+            
         return vel_cmd
 
 
@@ -151,10 +160,31 @@ class LineFollowerEnv(GazeboEnv):
                a reward
         @retval reward: the reward for the current step
         '''
-        reward = 0
 
-        # TODO: Implement process reward.
-        
+        ## heavy punishment if robot loses the line
+        if terminated:
+            return -10.0
+
+        ## positive reward section, rewards given for actions that align with the state
+        # elif state == 0 and action == 0:
+        #     reward = 5.0
+
+        # elif state == 2 and action == 2:
+        #     reward = 5.0
+            
+        # elif state == 1 and action == 1:
+        #     reward = 3.0
+
+        # ## negative punishment, punishes the robot when it takes the wrong action
+        # elif state == 0 and action != 0:
+        #     reward = -3.0 
+
+        # elif state == 2 and action != 2:
+        #     reward = -3.0
+
+        # elif state == 1 and action != 1:
+        #     reward = -2
+
         return reward
 
 
@@ -169,14 +199,32 @@ class LineFollowerEnv(GazeboEnv):
         @retval terminated: the termination condition occured - the line is no 
                     longer in the field of the camera
         '''
+        ## converts ROS Image to CV2 compatible
         cv_image = CvBridge().imgmsg_to_cv2(obs, desired_encoding='bgr8')
 
-        state = 0
-        terminated = False
+        ## takes bottom third of the image
+        h, w, _ = cv_image.shape
+        crop = cv_image[int(h * 2/3):h, :]
 
-        # TODO: Implement process observation
+        ## grayscale the cropped image
+        grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        ## line should be white, background black
+        _, threshImage = cv2.threshold(grayImage, 100, 255, cv2.THRESH_BINARY_INV)
 
-        return state, terminated
+        ## divide image into thirds, and count white pixels in each third
+        third = w // 3
+        sections = [
+            np.sum(threshImage[:, :third] > 0),
+            np.sum(threshImage[:, third:2*third] > 0),
+            np.sum(threshImage[:, 2*third:] > 0)
+        ]
+
+        ## if the max white pixel count across all sections is less than 30, it means robot is off track
+        if max(sections) < 30:
+            return -1, True
+
+        ## determines which has the most line pixels
+        return int(np.argmax(sections)), False
 
 
     # Shutting down ROS2
